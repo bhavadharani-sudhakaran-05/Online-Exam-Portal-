@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Test: Java MCQ</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #fff;
+      text-align: center;
+    }
+    h1 {
+      color: green;
+      margin-top: 20px;
+    }
+    #timer {
+      color: red;
+      font-size: 24px;
+      margin: 10px 0;
+    }
+    #webcam-container {
+      margin-top: 20px;
+    }
+    #question-container {
+      margin-top: 30px;
+    }
+    .malpractice {
+      color: red;
+      font-weight: bold;
+    }
+    button {
+      padding: 10px 20px;
+      margin-top: 20px;
+      background-color: green;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Test: Java </h1>
+  <div id="timer">Time Left: <span id="time">10:00</span></div>
+
+  <div id="webcam-container">
+    <video id="video" width="640" height="480" autoplay muted></video>
+    <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+  </div>
+
+  <div id="status"></div>
+
+  <div id="question-container"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.3.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+
+  <script>
+    const questions = [
+      {
+        question: "What is the size of an int in Java?",
+        answer: "4"
+      },
+      {
+        question: "What keyword is used to inherit a class in Java?",
+        answer: "extends"
+      },
+      {
+        question: "Which method is the entry point of a Java program?",
+        answer: "main"
+      },
+      {
+        question: "What is the default value of a boolean variable in Java?",
+        answer: "false"
+      }
+    ];
+
+    let currentQuestion = 0;
+    let score = 0;
+    let testInProgress = true;
+    let malpracticeDetected = false;
+    let totalTime = 10 * 60;
+
+    const timerEl = document.getElementById("time");
+    const questionContainer = document.getElementById("question-container");
+
+    function loadQuestion() {
+      if (currentQuestion >= questions.length) {
+        return endTest();
+      }
+
+      const q = questions[currentQuestion];
+      questionContainer.innerHTML = `
+        <h3>Question ${currentQuestion + 1}:</h3>
+        <p>${q.question}</p>
+        <input type="text" id="answer" placeholder="Type your answer here..." />
+        <br><button onclick="nextQuestion()">Next</button>
+      `;
+    }
+
+    function nextQuestion() {
+      const userAns = document.getElementById("answer").value.trim().toLowerCase();
+      if (userAns === questions[currentQuestion].answer.toLowerCase()) {
+        score++;
+      }
+      currentQuestion++;
+      loadQuestion();
+    }
+
+    function endTest() {
+      testInProgress = false;
+      clearInterval(timer);
+      questionContainer.innerHTML = `
+        <h2>Test Completed</h2>
+        <h3>Your Score: ${score} / ${questions.length}</h3>
+      `;
+      stopCamera();
+    }
+
+    function triggerMalpractice(reason) {
+      if (malpracticeDetected) return;
+      malpracticeDetected = true;
+      testInProgress = false;
+      score = 0;
+      clearInterval(timer);
+
+      document.getElementById("status").innerHTML = `<p class="malpractice">${reason}</p>`;
+      questionContainer.innerHTML = `
+        <h2 style="color:red;">Malpractice Detected</h2>
+        <p>${reason}</p>
+        <h3>Your Score: 0</h3>
+      `;
+      stopCamera();
+      alert("Malpractice detected! The test has ended and your score is 0.");
+    }
+
+    function stopCamera() {
+      if (video && video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+      }
+    }
+
+    // Timer
+    let timer = setInterval(() => {
+      if (!testInProgress) return;
+      totalTime--;
+      let min = Math.floor(totalTime / 60);
+      let sec = totalTime % 60;
+      timerEl.textContent = `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+      if (totalTime <= 0) {
+        endTest();
+      }
+    }, 1000);
+
+    // Tab Switch Detection
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden" && testInProgress && !malpracticeDetected) {
+        triggerMalpractice("You switched tabs during the test.");
+      }
+    });
+
+    // Camera + Object Detection
+    const video = document.getElementById("video");
+    async function startMonitoring() {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+
+      const model = await cocoSsd.load();
+      detect(model);
+    }
+
+    function detect(model) {
+      if (!testInProgress) return;
+      model.detect(video).then(predictions => {
+        const personCount = predictions.filter(p => p.class === "person").length;
+        const hasPhone = predictions.some(p => p.class === "cell phone");
+        const hasBook = predictions.some(p => p.class === "book");
+
+        if (personCount > 1 || hasPhone || hasBook) {
+          triggerMalpractice("Malpractice Detected: " +
+            (personCount > 1 ? "Multiple persons " : "") +
+            (hasBook ? "Book " : "") +
+            (hasPhone ? "Mobile phone" : "")
+          );
+        } else {
+          requestAnimationFrame(() => detect(model));
+        }
+      });
+    }
+
+    // Start test
+    window.onload = () => {
+      loadQuestion();
+      startMonitoring();
+    };
+  </script>
+
+</body>
+</html>
