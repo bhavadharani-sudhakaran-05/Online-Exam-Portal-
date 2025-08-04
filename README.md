@@ -11,13 +11,14 @@ This project is a web-based **Online Exam Portal** designed to streamline the pr
 - Add questions (MCQ)
 - View student results
 - Export results in Excel format
-
+-username:Teacher01 Password:admin123
 ### 👩‍🎓 Student
 - Login and take exams
 - Real-time timer for each exam
 - Malpractice detection:
   - Tab switch detection
   - Camera monitoring: detects books, mobiles, multiple persons
+-username:it_230001 Password:pass123
 
 ## 🛠️ Tech Stack
 - **Frontend:** HTML, CSS, JavaScript
